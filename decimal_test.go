@@ -1,6 +1,7 @@
 package big
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -120,5 +121,31 @@ func TestDecimal(t *testing.T) {
 		assert.EqualValues(t, 1, f.Float())
 		assert.EqualValues(t, 0, ZERO.Float())
 		assert.EqualValues(t, 1, ONE.Float())
+	})
+}
+
+func TestDecimal_Json(t *testing.T) {
+	type jsonType struct {
+		Decimal Decimal `json:"decimal"`
+	}
+
+	t.Run("MarshalJSON", func(t *testing.T) {
+		tmpStruct := jsonType{
+			Decimal: ONE,
+		}
+		marshaled, err := json.Marshal(tmpStruct)
+
+		assert.NoError(t, err)
+		assert.Equal(t, `{"decimal":1}`, string(marshaled))
+	})
+
+	t.Run("UnmarshalJSON", func(t *testing.T) {
+		var ts jsonType
+
+		d := `{"decimal":1.23}`
+		err := json.Unmarshal([]byte(d), &ts)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "1.23", ts.Decimal.String())
 	})
 }

@@ -115,6 +115,20 @@ func (d Decimal) String() string {
 	return d.fl.String()
 }
 
+// MarshalJSON implements the json.Marshaler interface
+func (d Decimal) MarshalJSON() ([]byte, error) {
+	return d.fl.MarshalText()
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface
+func (d *Decimal) UnmarshalJSON(b []byte) error {
+	if d.fl == nil {
+		d.fl = big.NewFloat(0)
+	}
+
+	return d.fl.UnmarshalText(b)
+}
+
 func (d Decimal) cpy() *big.Float {
 	cpy := new(big.Float)
 	return cpy.Copy(d.fl)
