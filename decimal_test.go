@@ -149,3 +149,33 @@ func TestDecimal_Json(t *testing.T) {
 		assert.Equal(t, "1.23", ts.Decimal.String())
 	})
 }
+
+func TestDecimal_Sql(t *testing.T) {
+	t.Run("Value", func(t *testing.T) {
+		d := ONE
+		value, err := d.Value()
+
+		assert.NoError(t, err)
+		assert.Equal(t, `1`, value)
+	})
+
+	t.Run("Scan", func(t *testing.T) {
+		var d Decimal
+
+		data := `1.23`
+		err := d.Scan(data)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "1.23", d.String())
+	})
+
+	t.Run("Scan returns error when src is not string", func(t *testing.T) {
+		var d Decimal
+
+		data := 1.23
+		err := d.Scan(data)
+
+		assert.NotNil(t, err)
+		assert.EqualValues(t, "Passed value 1.23 should be a string", err.Error())
+	})
+}

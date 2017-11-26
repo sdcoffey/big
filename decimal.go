@@ -1,6 +1,10 @@
 package big
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"math/big"
 )
 
@@ -127,6 +131,21 @@ func (d *Decimal) UnmarshalJSON(b []byte) error {
 	}
 
 	return d.fl.UnmarshalText(b)
+}
+
+// Value implements the sql.Valuer interface
+func (d Decimal) Value() (driver.Value, error) {
+	return d.String(), nil
+}
+
+// Scan implements the sql.Scanner interface
+func (d *Decimal) Scan(src interface{}) error {
+	switch src.(type) {
+	case string:
+		return json.Unmarshal([]byte(src.(string)), d)
+	default:
+		return errors.New(fmt.Sprint("Passed value ", src, " should be a string"))
+	}
 }
 
 func (d Decimal) cpy() *big.Float {
