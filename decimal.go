@@ -1,4 +1,4 @@
-package talib4g
+package big
 
 import (
 	"math/big"
