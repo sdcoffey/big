@@ -33,6 +33,8 @@ func TestDecimal(t *testing.T) {
 		f2 := NewDecimal(2)
 
 		assert.EqualValues(t, "6.28", f1.Mul(f2).String())
+		assert.EqualValues(t, "3.14", f1.String())
+		assert.EqualValues(t, "2", f2.String())
 	})
 
 	t.Run("Div", func(t *testing.T) {
@@ -112,6 +114,14 @@ func TestDecimal(t *testing.T) {
 	t.Run("String", func(t *testing.T) {
 		f := NewDecimal(1.3419)
 		assert.EqualValues(t, "1.3419", f.String())
+	})
+
+	t.Run("FormattedString", func(t *testing.T) {
+		f := NewDecimal(1.3419)
+
+		assert.EqualValues(t, "1.3419", f.FormattedString(4))
+		assert.EqualValues(t, "1.341900", f.FormattedString(6))
+		assert.EqualValues(t, "1.3", f.FormattedString(1))
 	})
 
 	t.Run("ZERO", func(t *testing.T) {

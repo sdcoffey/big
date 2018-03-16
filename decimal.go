@@ -119,6 +119,12 @@ func (d Decimal) String() string {
 	return d.fl.String()
 }
 
+func (d Decimal) FormattedString(places int) string {
+	format := "%." + fmt.Sprint(places) + "f"
+	fl := d.Float()
+	return fmt.Sprintf(format, fl)
+}
+
 // MarshalJSON implements the json.Marshaler interface
 func (d Decimal) MarshalJSON() ([]byte, error) {
 	return d.fl.MarshalText()
