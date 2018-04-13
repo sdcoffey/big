@@ -27,9 +27,9 @@ func NewDecimal(fl float64) Decimal {
 }
 
 // NewFromString creates a new Decimal type from a string value.
-func NewFromString(fl string) Decimal {
+func NewFromString(str string) Decimal {
 	bfl := new(big.Float)
-	bfl.UnmarshalText([]byte(fl))
+	bfl.UnmarshalText([]byte(str))
 	return Decimal{bfl}
 }
 
@@ -71,6 +71,26 @@ func (d Decimal) Abs() Decimal {
 	}
 
 	return d
+}
+
+// Pow returns the decimal to the inputted power
+func (d Decimal) Pow(exp int) Decimal {
+	if exp == 0 {
+		return ONE
+	}
+
+	x := Decimal{d.cpy()}
+
+	for i := 1; i < exp; i++ {
+		x = x.Mul(d)
+	}
+
+	return x
+}
+
+// Sqrt returns the deciamal's square root
+func (d Decimal) Sqrt() Decimal {
+	return Decimal{d.cpy().Sqrt(d.cpy())}
 }
 
 // EQ returns true if this Decimal exactly equals the provided decimal.
