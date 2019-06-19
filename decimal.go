@@ -169,6 +169,8 @@ func (d *Decimal) Scan(src interface{}) error {
 	switch src.(type) {
 	case string:
 		return json.Unmarshal([]byte(src.(string)), d)
+	case []byte:
+		return json.Unmarshal([]byte(src.([]byte)), d)
 	default:
 		return errors.New(fmt.Sprint("Passed value ", src, " should be a string"))
 	}
