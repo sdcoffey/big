@@ -142,6 +142,10 @@ func (d Decimal) IsZero() bool {
 }
 
 func (d Decimal) String() string {
+	if d.fl == nil {
+		d.fl = new(big.Float)
+	}
+
 	return d.fl.String()
 }
 

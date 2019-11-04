@@ -133,6 +133,12 @@ func TestDecimal(t *testing.T) {
 		assert.EqualValues(t, "1.3419", f.String())
 	})
 
+	t.Run("String - zero", func(t *testing.T) {
+		f := Decimal{}
+		assert.EqualValues(t, "0", f.String())
+
+	})
+
 	t.Run("FormattedString", func(t *testing.T) {
 		f := NewDecimal(1.3419)
 
