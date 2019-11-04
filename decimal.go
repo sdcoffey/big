@@ -27,9 +27,9 @@ func NewDecimal(fl float64) Decimal {
 }
 
 // NewFromString creates a new Decimal type from a string value.
-func NewFromString(fl string) Decimal {
+func NewFromString(str string) Decimal {
 	bfl := new(big.Float)
-	bfl.UnmarshalText([]byte(fl))
+	bfl.UnmarshalText([]byte(str))
 	return Decimal{bfl}
 }
 
@@ -169,6 +169,8 @@ func (d *Decimal) Scan(src interface{}) error {
 	switch src.(type) {
 	case string:
 		return json.Unmarshal([]byte(src.(string)), d)
+	case []byte:
+		return json.Unmarshal([]byte(src.([]byte)), d)
 	default:
 		return errors.New(fmt.Sprint("Passed value ", src, " should be a string"))
 	}

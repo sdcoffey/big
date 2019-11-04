@@ -196,6 +196,16 @@ func TestDecimal_Sql(t *testing.T) {
 		assert.Equal(t, "1.23", d.String())
 	})
 
+	t.Run("Scan []byte", func(t *testing.T) {
+		var d Decimal
+
+		data := `1.23`
+		err := d.Scan([]byte(data))
+
+		assert.NoError(t, err)
+		assert.Equal(t, "1.23", d.String())
+	})
+
 	t.Run("Scan returns error when src is not string", func(t *testing.T) {
 		var d Decimal
 
