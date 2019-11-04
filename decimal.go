@@ -73,6 +73,26 @@ func (d Decimal) Abs() Decimal {
 	return d
 }
 
+// Pow returns the decimal to the inputted power
+func (d Decimal) Pow(exp int) Decimal {
+	if exp == 0 {
+		return ONE
+	}
+
+	x := Decimal{d.cpy()}
+
+	for i := 1; i < exp; i++ {
+		x = x.Mul(d)
+	}
+
+	return x
+}
+
+// Sqrt returns the deciamal's square root
+func (d Decimal) Sqrt() Decimal {
+	return Decimal{d.cpy().Sqrt(d.cpy())}
+}
+
 // EQ returns true if this Decimal exactly equals the provided decimal.
 func (d Decimal) EQ(other Decimal) bool {
 	return d.Cmp(other) == 0
