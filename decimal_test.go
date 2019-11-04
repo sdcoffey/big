@@ -149,6 +149,24 @@ func TestDecimal(t *testing.T) {
 		assert.EqualValues(t, 0, ZERO.Float())
 		assert.EqualValues(t, 1, ONE.Float())
 	})
+
+	t.Run("IsZero -- when nil", func(t *testing.T) {
+		f := Decimal{}
+
+		assert.True(t, f.IsZero())
+	})
+
+	t.Run("IsZero -- when zero", func(t *testing.T) {
+		f := NewFromString("0")
+
+		assert.True(t, f.IsZero())
+	})
+
+	t.Run("IsZero -- when not zero", func(t *testing.T) {
+		f := NewFromString("1")
+
+		assert.False(t, f.IsZero())
+	})
 }
 
 func TestDecimal_Json(t *testing.T) {

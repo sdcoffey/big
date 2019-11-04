@@ -131,8 +131,14 @@ func (d Decimal) Float() float64 {
 }
 
 // Zero will return true if this Decimal is equal to 0.
+// Note: Zero is deprecated. Use IsZero instead
 func (d Decimal) Zero() bool {
-	return d.fl.Cmp(&flZero) == 0
+	return d.IsZero()
+}
+
+// IsZero will return true if this Decimal is equal to 0.
+func (d Decimal) IsZero() bool {
+	return d.fl == nil || d.fl.Cmp(&flZero) == 0
 }
 
 func (d Decimal) String() string {
