@@ -14,6 +14,8 @@ var (
 	ZERO = NewDecimal(0)
 	ONE  = NewDecimal(1)
 	TEN  = NewDecimal(10)
+
+	MarshalQuoted = false
 )
 
 // Decimal is the main exported type. It is a simple, immutable wrapper around a *big.Float
@@ -157,6 +159,10 @@ func (d Decimal) FormattedString(places int) string {
 
 // MarshalJSON implements the json.Marshaler interface
 func (d Decimal) MarshalJSON() ([]byte, error) {
+	if MarshalQuoted {
+		return []byte("\"" + d.String() + "\""), nil
+	}
+
 	return d.fl.MarshalText()
 }
 
@@ -166,7 +172,16 @@ func (d *Decimal) UnmarshalJSON(b []byte) error {
 		d.fl = big.NewFloat(0)
 	}
 
+	if isQuoted(b) {
+		b = b[1 : len(b)-1]
+	}
+
 	return d.fl.UnmarshalText(b)
+}
+
+func isQuoted(b []byte) bool {
+	quoteByte := byte('"')
+	return len(b) > 0 && b[0] == quoteByte && b[len(b)-1] == quoteByte
 }
 
 // Value implements the sql.Valuer interface

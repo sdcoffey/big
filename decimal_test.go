@@ -180,24 +180,46 @@ func TestDecimal_Json(t *testing.T) {
 		Decimal Decimal `json:"decimal"`
 	}
 
-	t.Run("MarshalJSON", func(t *testing.T) {
+	t.Run("MarshalJSON - quoted", func(t *testing.T) {
+		MarshalQuoted = true
 		tmpStruct := jsonType{
-			Decimal: ONE,
+			Decimal: NewFromString("3.1419"),
 		}
 		marshaled, err := json.Marshal(tmpStruct)
 
 		assert.NoError(t, err)
-		assert.Equal(t, `{"decimal":1}`, string(marshaled))
+		assert.Equal(t, `{"decimal":"3.1419"}`, string(marshaled))
+		MarshalQuoted = false
 	})
 
-	t.Run("UnmarshalJSON", func(t *testing.T) {
+	t.Run("MarshalJSON - unquoted", func(t *testing.T) {
+		tmpStruct := jsonType{
+			Decimal: NewFromString("3.1419"),
+		}
+		marshaled, err := json.Marshal(tmpStruct)
+
+		assert.NoError(t, err)
+		assert.Equal(t, `{"decimal":3.1419}`, string(marshaled))
+	})
+
+	t.Run("UnmarshalJSON - unquoted", func(t *testing.T) {
 		var ts jsonType
 
-		d := `{"decimal":1.23}`
+		d := `{"decimal":3.1419}`
 		err := json.Unmarshal([]byte(d), &ts)
 
 		assert.NoError(t, err)
-		assert.Equal(t, "1.23", ts.Decimal.String())
+		assert.Equal(t, "3.1419", ts.Decimal.String())
+	})
+
+	t.Run("UnmarshalJSON - quoted", func(t *testing.T) {
+		var ts jsonType
+
+		d := `{"decimal":"3.1419"}`
+		err := json.Unmarshal([]byte(d), &ts)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "3.1419", ts.Decimal.String())
 	})
 }
 
