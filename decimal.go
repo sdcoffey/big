@@ -125,6 +125,24 @@ func (d Decimal) Cmp(other Decimal) int {
 	return d.fl.Cmp(other.fl)
 }
 
+// Max will return the max Decimal between two Decimals
+func (d Decimal) Max(other Decimal) Decimal {
+	if d.GTE(other) {
+		return d
+	}
+
+	return other
+}
+
+// Min will return the min Decimal between two Decimals
+func (d Decimal) Min(other Decimal) Decimal {
+	if d.LTE(other) {
+		return d
+	}
+
+	return other
+}
+
 // Float will return this Decimal as a float value.
 // Note that there may be some loss of precision in this operation.
 func (d Decimal) Float() float64 {
