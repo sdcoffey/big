@@ -14,6 +14,12 @@ func TestDecimal(t *testing.T) {
 		assert.EqualValues(t, "1.87", d.String())
 	})
 
+	t.Run("NewFromInt", func(t *testing.T) {
+		d := NewFromInt(1)
+
+		assert.EqualValues(t, "1", d.String())
+	})
+
 	t.Run("Add", func(t *testing.T) {
 		f1 := NewDecimal(3.14)
 		f2 := NewDecimal(2)

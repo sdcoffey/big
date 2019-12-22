@@ -35,6 +35,11 @@ func NewFromString(str string) Decimal {
 	return Decimal{bfl}
 }
 
+// NewFromInt creates a new Decimal type from an int value
+func NewFromInt(dec int) Decimal {
+	return Decimal{big.NewFloat(float64(dec))}
+}
+
 // Add adds a decimal instance to another Decimal instance.
 func (d Decimal) Add(addend Decimal) Decimal {
 	return Decimal{d.cpy().Add(d.fl, addend.fl)}
