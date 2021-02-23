@@ -40,6 +40,31 @@ func NewFromInt(dec int) Decimal {
 	return Decimal{big.NewFloat(float64(dec))}
 }
 
+// MaxSlice returns the max of a slice of decimals
+func MaxSlice(decimals ...Decimal) Decimal {
+	initial := NewFromString("-Inf")
+
+	for _, decimal := range decimals {
+		if decimal.GT(initial) {
+			initial = decimal
+		}
+	}
+
+	return initial
+}
+
+// MinSlice returns the min of a slice of decimals
+func MinSlice(decimals ...Decimal) Decimal {
+	initial := NewFromString("Inf")
+	for _, decimal := range decimals {
+		if decimal.LT(initial) {
+			initial = decimal
+		}
+	}
+
+	return initial
+}
+
 // Add adds a decimal instance to another Decimal instance.
 func (d Decimal) Add(addend Decimal) Decimal {
 	return Decimal{d.cpy().Add(d.fl, addend.fl)}
@@ -95,7 +120,7 @@ func (d Decimal) Pow(exp int) Decimal {
 	return x
 }
 
-// Sqrt returns the deciamal's square root
+// Sqrt returns the decimal's square root
 func (d Decimal) Sqrt() Decimal {
 	return Decimal{d.cpy().Sqrt(d.cpy())}
 }

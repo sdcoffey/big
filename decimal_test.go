@@ -20,6 +20,26 @@ func TestDecimal(t *testing.T) {
 		assert.EqualValues(t, "1", d.String())
 	})
 
+	t.Run("MaxSlice", func(t *testing.T) {
+		slc := []Decimal{
+			NewDecimal(-100),
+			NewDecimal(100),
+			NewDecimal(0),
+		}
+
+		assert.EqualValues(t, "100", MaxSlice(slc...).String())
+	})
+
+	t.Run("MinSlice", func(t *testing.T) {
+		slc := []Decimal{
+			NewDecimal(-100),
+			NewDecimal(100),
+			NewDecimal(0),
+		}
+
+		assert.EqualValues(t, "-100", MinSlice(slc...).String())
+	})
+
 	t.Run("Add", func(t *testing.T) {
 		f1 := NewDecimal(3.14)
 		f2 := NewDecimal(2)
