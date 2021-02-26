@@ -13,9 +13,9 @@ var (
 	flZero = *big.NewFloat(0)
 
 	NaN  = NewDecimal(math.NaN())
-	ZERO = NewDecimal(0)
-	ONE  = NewDecimal(1)
-	TEN  = NewDecimal(10)
+	ZERO = NewFromString("0")
+	ONE  = NewFromString("1")
+	TEN  = NewFromString("10")
 
 	MarshalQuoted = false
 )
