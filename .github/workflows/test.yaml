@@ -10,5 +10,9 @@ jobs:
           go-version: 1.16
       - name: Checkout Code
         uses: actions/checkout@v2
+      - name: Bootstrap environment
+        run: make bootstrap
+      - name: Lint
+        run: make lint
       - name: Run Tests
         run: make test
