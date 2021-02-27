@@ -12,11 +12,19 @@ import (
 var (
 	flZero = *big.NewFloat(0)
 
-	NaN  = NewDecimal(math.NaN())
-	ZERO = NewFromString("0")
-	ONE  = NewFromString("1")
-	TEN  = NewFromString("10")
+	// NaN == Not a Number
+	NaN = NewDecimal(math.NaN())
 
+	// ZERO == 0
+	ZERO = NewFromString("0")
+
+	// ONE == 1
+	ONE = NewFromString("1")
+
+	// TEN == 10
+	TEN = NewFromString("10")
+
+	// MarshalQuoted - can toggle this to true to marshal values as strings
 	MarshalQuoted = false
 )
 
@@ -49,11 +57,11 @@ func NewDecimal(val float64) Decimal {
 func NewFromString(str string) Decimal {
 	bfl := big.NewFloat(0)
 
-	if bfl, _, err := bfl.Parse(str, 10); err != nil {
+	if _, _, err := bfl.Parse(str, 10); err != nil {
 		return NaN
-	} else {
-		return Decimal{bfl}
 	}
+
+	return Decimal{bfl}
 }
 
 // NewFromInt creates a new Decimal type from an int value
@@ -247,7 +255,7 @@ func (d Decimal) Zero() bool {
 	return d.IsZero()
 }
 
-// Returns true if the underlying is not a valid number
+// NaN returns true if the underlying is not a valid number
 func (d Decimal) NaN() bool {
 	return d.fl == nil
 }
@@ -273,6 +281,7 @@ func (d Decimal) String() string {
 	return d.fl.String()
 }
 
+// FormattedString returns the string value of the number to the requested precision
 func (d Decimal) FormattedString(places int) string {
 	if d.NaN() {
 		return d.String()
@@ -317,11 +326,11 @@ func (d Decimal) Value() (driver.Value, error) {
 
 // Scan implements the sql.Scanner interface
 func (d *Decimal) Scan(src interface{}) error {
-	switch src.(type) {
+	switch src := src.(type) {
 	case string:
-		return json.Unmarshal([]byte(src.(string)), d)
+		return json.Unmarshal([]byte(src), d)
 	case []byte:
-		return json.Unmarshal([]byte(src.([]byte)), d)
+		return json.Unmarshal(src, d)
 	default:
 		return errors.New(fmt.Sprint("Passed value ", src, " should be a string"))
 	}
@@ -340,16 +349,6 @@ func anyNan(decimals ...Decimal) bool {
 	}
 
 	return false
-}
-
-func allNan(decimals ...Decimal) bool {
-	for _, decimal := range decimals {
-		if !decimal.NaN() {
-			return false
-		}
-	}
-
-	return true
 }
 
 func nanGuard(yeildFunc func() Decimal, decimals ...Decimal) Decimal {
