@@ -2,205 +2,397 @@ package big
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDecimal(t *testing.T) {
-	t.Run("NewFromString", func(t *testing.T) {
-		d := NewFromString("1.87")
+type equalExample struct {
+	value    Decimal
+	expected string
+}
 
-		assert.EqualValues(t, "1.87", d.String())
-	})
+type booleanExample struct {
+	value    bool
+	expected bool
+}
 
-	t.Run("NewFromInt", func(t *testing.T) {
-		d := NewFromInt(1)
+func validateEqExamples(t *testing.T, examples ...equalExample) {
+	for _, ex := range examples {
+		assert.EqualValues(t, ex.expected, ex.value.String())
+	}
+}
 
-		assert.EqualValues(t, "1", d.String())
-	})
-
-	t.Run("MaxSlice", func(t *testing.T) {
-		slc := []Decimal{
-			NewDecimal(-100),
-			NewDecimal(100),
-			NewDecimal(0),
+func validateBoolExamples(t *testing.T, examples ...booleanExample) {
+	for _, ex := range examples {
+		if ex.expected {
+			assert.True(t, ex.value)
+		} else {
+			assert.False(t, ex.value)
 		}
+	}
+}
 
-		assert.EqualValues(t, "100", MaxSlice(slc...).String())
+func TestNewDecimal(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		d := NewDecimal(math.Pi)
+
+		assert.EqualValues(t, math.Pi, d.Float())
 	})
 
-	t.Run("MinSlice", func(t *testing.T) {
-		slc := []Decimal{
-			NewDecimal(-100),
-			NewDecimal(100),
-			NewDecimal(0),
-		}
+	t.Run("NaN", func(t *testing.T) {
+		d := NewDecimal(math.NaN())
 
-		assert.EqualValues(t, "-100", MinSlice(slc...).String())
-	})
-
-	t.Run("Add", func(t *testing.T) {
-		f1 := NewDecimal(3.14)
-		f2 := NewDecimal(2)
-
-		assert.EqualValues(t, "5.14", f1.Add(f2).String())
-	})
-
-	t.Run("Sub", func(t *testing.T) {
-		f1 := NewDecimal(3.14)
-		f2 := NewDecimal(2)
-
-		assert.EqualValues(t, "1.14", f1.Sub(f2).String())
-	})
-
-	t.Run("Mul", func(t *testing.T) {
-		f1 := NewDecimal(3.14)
-		f2 := NewDecimal(2)
-
-		assert.EqualValues(t, "6.28", f1.Mul(f2).String())
-		assert.EqualValues(t, "3.14", f1.String())
-		assert.EqualValues(t, "2", f2.String())
-	})
-
-	t.Run("Div", func(t *testing.T) {
-		f1 := NewDecimal(3.14)
-		f2 := NewDecimal(2)
-
-		assert.EqualValues(t, "1.57", f1.Div(f2).String())
-	})
-
-	t.Run("Neg", func(t *testing.T) {
-		f1 := NewDecimal(3.14)
-
-		assert.EqualValues(t, "-3.14", f1.Neg().String())
-	})
-
-	t.Run("Abs", func(t *testing.T) {
-		f1 := NewDecimal(3.14)
-		assert.EqualValues(t, 3.14, f1.Abs().Float())
-
-		f2 := NewDecimal(-3.14)
-		assert.EqualValues(t, 3.14, f2.Abs().Float())
-	})
-
-	t.Run("Frac", func(t *testing.T) {
-		f1 := NewDecimal(3.14)
-
-		assert.EqualValues(t, 1.57, f1.Frac(0.5).Float())
-	})
-
-	t.Run("EQ", func(t *testing.T) {
-		f1 := NewDecimal(182.1921)
-		f2 := NewDecimal(182.1921)
-
-		assert.True(t, f2.EQ(f1))
-	})
-
-	t.Run("GT", func(t *testing.T) {
-		f1 := NewDecimal(1.3419)
-		f2 := NewDecimal(13419)
-
-		assert.True(t, f2.GT(f1))
-	})
-
-	t.Run("GTE", func(t *testing.T) {
-		f1 := NewDecimal(1.3419)
-		f2 := NewDecimal(1.3419)
-
-		assert.True(t, f2.GTE(f1))
-	})
-
-	t.Run("LT", func(t *testing.T) {
-		f1 := NewDecimal(1.3419)
-		f2 := NewDecimal(13419)
-
-		assert.True(t, f1.LT(f2))
-	})
-
-	t.Run("LTE", func(t *testing.T) {
-		f1 := NewDecimal(1.3419)
-		f2 := NewDecimal(1.3419)
-
-		assert.True(t, f1.LTE(f2))
-	})
-
-	t.Run("Cmp", func(t *testing.T) {
-		f1 := NewDecimal(1.3419)
-		f2 := NewDecimal(13419)
-
-		assert.EqualValues(t, 1, f2.Cmp(f1))
-	})
-
-	t.Run("Float", func(t *testing.T) {
-		f := NewDecimal(1.3419)
-		assert.EqualValues(t, 1.3419, f.Float())
-	})
-
-	t.Run("Pow", func(t *testing.T) {
-		t.Run("when exp is 0", func(t *testing.T) {
-			f := NewDecimal(8)
-			assert.EqualValues(t, 1, f.Pow(0).Float())
-		})
-
-		t.Run("when exp is positive", func(t *testing.T) {
-			f := NewDecimal(8)
-			assert.EqualValues(t, 512, f.Pow(3).Float())
-		})
-	})
-
-	t.Run("Sqrt", func(t *testing.T) {
-		f := NewDecimal(64)
-		assert.EqualValues(t, 8, f.Sqrt().Float())
-	})
-
-	t.Run("String", func(t *testing.T) {
-		f := NewDecimal(1.3419)
-		assert.EqualValues(t, "1.3419", f.String())
-	})
-
-	t.Run("String - zero", func(t *testing.T) {
-		f := Decimal{}
-		assert.EqualValues(t, "0", f.String())
-
-	})
-
-	t.Run("FormattedString", func(t *testing.T) {
-		f := NewDecimal(1.3419)
-
-		assert.EqualValues(t, "1.3419", f.FormattedString(4))
-		assert.EqualValues(t, "1.341900", f.FormattedString(6))
-		assert.EqualValues(t, "1.3", f.FormattedString(1))
-	})
-
-	t.Run("ZERO", func(t *testing.T) {
-		f := ZERO
-		f = f.Add(ONE)
-
-		assert.EqualValues(t, 1, f.Float())
-		assert.EqualValues(t, 0, ZERO.Float())
-		assert.EqualValues(t, 1, ONE.Float())
-	})
-
-	t.Run("IsZero -- when nil", func(t *testing.T) {
-		f := Decimal{}
-
-		assert.True(t, f.IsZero())
-	})
-
-	t.Run("IsZero -- when zero", func(t *testing.T) {
-		f := NewFromString("0")
-
-		assert.True(t, f.IsZero())
-	})
-
-	t.Run("IsZero -- when not zero", func(t *testing.T) {
-		f := NewFromString("1")
-
-		assert.False(t, f.IsZero())
+		assert.Nil(t, d.fl)
 	})
 }
 
+func TestNewFromString(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value:    NewFromString("1.87"),
+			expected: "1.87",
+		},
+		equalExample{
+			value:    NewFromString("NaN"),
+			expected: "NaN",
+		},
+	)
+}
+
+func TestNewFromInt(t *testing.T) {
+	d := NewFromInt(1)
+
+	assert.EqualValues(t, "1", d.String())
+}
+
+func TestMaxSlice(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value: MaxSlice(NewDecimal(-100),
+				NewDecimal(100),
+				NewDecimal(0)),
+			expected: "100",
+		},
+		equalExample{
+			value:    MaxSlice(NewDecimal(100), NaN),
+			expected: "NaN",
+		},
+		equalExample{
+			value:    MaxSlice(),
+			expected: "0",
+		},
+	)
+}
+
+func TestMinSlice(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value: MinSlice(NewDecimal(-100),
+				NewDecimal(100),
+				NewDecimal(0)),
+			expected: "-100",
+		},
+		equalExample{
+			value:    MinSlice(NewDecimal(100), NaN),
+			expected: "NaN",
+		},
+		equalExample{
+			value:    MinSlice(),
+			expected: "0",
+		},
+	)
+}
+
+func TestDecimal_Add(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value:    NewDecimal(3.14).Add(NewDecimal(2)),
+			expected: "5.14",
+		},
+		equalExample{
+			value:    NaN.Add(NewDecimal(2)),
+			expected: "NaN",
+		},
+		equalExample{
+			value:    NewDecimal(1).Add(NaN),
+			expected: "NaN",
+		},
+	)
+}
+
+func TestDecimal_Sub(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value:    NewDecimal(3.14).Sub(NewDecimal(2)),
+			expected: "1.14",
+		},
+		equalExample{
+			value:    NaN.Sub(NewDecimal(1)),
+			expected: "NaN",
+		},
+		equalExample{
+			value:    ONE.Sub(NaN),
+			expected: "NaN",
+		},
+	)
+}
+
+func TestDecimal_Mul(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value:    NewDecimal(3.14).Mul(TEN),
+			expected: "31.4",
+		},
+		equalExample{
+			value:    NaN.Mul(TEN),
+			expected: "NaN",
+		},
+		equalExample{
+			value:    TEN.Mul(NaN),
+			expected: "NaN",
+		},
+	)
+}
+
+func TestDecimal_Div(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value:    NewDecimal(3.14).Div(TEN),
+			expected: "0.314",
+		},
+		equalExample{
+			value:    TEN.Div(NaN),
+			expected: "NaN",
+		},
+		equalExample{
+			value:    NaN.Div(TEN),
+			expected: "NaN",
+		},
+	)
+}
+
+func TestDecimal_Neg(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value:    TEN.Neg(),
+			expected: "-10",
+		},
+		equalExample{
+			value:    NaN.Neg(),
+			expected: "NaN",
+		},
+	)
+}
+
+func TestDecimal_Abs(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value:    TEN.Abs(),
+			expected: "10",
+		},
+		equalExample{
+			value:    NewFromString("-10").Abs(),
+			expected: "10",
+		},
+		equalExample{
+			value:    NaN.Abs(),
+			expected: "NaN",
+		},
+	)
+}
+
+func TestDecimal_Frac(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value:    TEN.Frac(0.5),
+			expected: "5",
+		},
+		equalExample{
+			value:    TEN.Frac(1.5),
+			expected: "15",
+		},
+		equalExample{
+			value:    NaN.Frac(0.5),
+			expected: "NaN",
+		},
+	)
+}
+
+func TestDecimal_EQ(t *testing.T) {
+	validateBoolExamples(t,
+		booleanExample{
+			value:    NewDecimal(182.1921).EQ(NewDecimal(182.1921)),
+			expected: true,
+		},
+		booleanExample{
+			value:    NaN.EQ(NaN),
+			expected: false,
+		},
+	)
+}
+
+func TestDecimal_GT(t *testing.T) {
+	validateBoolExamples(t,
+		booleanExample{
+			value:    NewDecimal(182.1921).GT(NewDecimal(182.1921)),
+			expected: false,
+		},
+		booleanExample{
+			value:    NewDecimal(182.1920).GT(NewDecimal(182.1921)),
+			expected: false,
+		},
+		booleanExample{
+			value:    NewDecimal(182.1921).GT(NewDecimal(182.1920)),
+			expected: true,
+		},
+		booleanExample{
+			value:    NaN.GT(NaN),
+			expected: false,
+		},
+	)
+}
+
+func TestDecimal_GTE(t *testing.T) {
+	validateBoolExamples(t,
+		booleanExample{
+			value:    NewDecimal(182.1921).GTE(NewDecimal(182.1921)),
+			expected: true,
+		},
+		booleanExample{
+			value:    NewDecimal(182.1920).GTE(NewDecimal(182.1921)),
+			expected: false,
+		},
+		booleanExample{
+			value:    NewDecimal(182.1921).GTE(NewDecimal(182.1920)),
+			expected: true,
+		},
+		booleanExample{
+			value:    NaN.GTE(NaN),
+			expected: false,
+		},
+	)
+}
+
+func TestDecimal_LT(t *testing.T) {
+	validateBoolExamples(t,
+		booleanExample{
+			value:    NewDecimal(182.1921).LT(NewDecimal(182.1921)),
+			expected: false,
+		},
+		booleanExample{
+			value:    NewDecimal(182.1920).LT(NewDecimal(182.1921)),
+			expected: true,
+		},
+		booleanExample{
+			value:    NewDecimal(182.1921).LT(NewDecimal(182.1920)),
+			expected: false,
+		},
+		booleanExample{
+			value:    NaN.LT(NaN),
+			expected: false,
+		},
+	)
+}
+
+func TestDecimal_LTE(t *testing.T) {
+	validateBoolExamples(t,
+		booleanExample{
+			value:    NewDecimal(182.1921).LTE(NewDecimal(182.1921)),
+			expected: true,
+		},
+		booleanExample{
+			value:    NewDecimal(182.1920).LTE(NewDecimal(182.1921)),
+			expected: true,
+		},
+		booleanExample{
+			value:    NewDecimal(182.1921).LTE(NewDecimal(182.1920)),
+			expected: false,
+		},
+		booleanExample{
+			value:    NaN.LTE(NaN),
+			expected: false,
+		},
+	)
+}
+
+func TestDecimal_Cmp(t *testing.T) {
+	assert.EqualValues(t, 0, ONE.Cmp(ONE))
+	assert.EqualValues(t, 1, TEN.Cmp(ONE))
+	assert.EqualValues(t, -1, ONE.Cmp(TEN))
+	assert.EqualValues(t, 0, NaN.Cmp(NaN))
+}
+
+func TestDecimal_Float(t *testing.T) {
+	assert.EqualValues(t, 1.13, NewDecimal(1.13).Float())
+	assert.True(t, math.IsNaN(NaN.Float()))
+}
+
+func TestDecimal_Pow(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value:    NewDecimal(8).Pow(2),
+			expected: "64",
+		},
+		equalExample{
+			value:    TEN.Pow(0),
+			expected: "1",
+		},
+		equalExample{
+			value:    NaN.Pow(2),
+			expected: "NaN",
+		},
+	)
+}
+
+func TestDecimal_Sqrt(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value:    NewDecimal(64).Sqrt(),
+			expected: "8",
+		},
+		equalExample{
+			value:    NaN.Sqrt(),
+			expected: "NaN",
+		},
+	)
+}
+
+func TestDecimal_String(t *testing.T) {
+	validateEqExamples(t,
+		equalExample{
+			value:    NewDecimal(1.13),
+			expected: "1.13",
+		},
+		equalExample{
+			value:    NaN,
+			expected: "NaN",
+		},
+	)
+}
+
+func TestDecimal_FormattedString(t *testing.T) {
+	assert.EqualValues(t, "3.1416", NewDecimal(math.Pi).FormattedString(4))
+	assert.EqualValues(t, "NaN", NaN.FormattedString(4))
+}
+
+func TestDecimal_IsZero(t *testing.T) {
+	validateBoolExamples(t,
+		booleanExample{
+			value:    ZERO.IsZero(),
+			expected: true,
+		},
+		booleanExample{
+			value:    ONE.IsZero(),
+			expected: false,
+		},
+		booleanExample{
+			value:    NaN.IsZero(),
+			expected: false,
+		},
+	)
+}
 func TestDecimal_Json(t *testing.T) {
 	type jsonType struct {
 		Decimal Decimal `json:"decimal"`
