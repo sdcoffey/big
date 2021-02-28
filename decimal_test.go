@@ -480,3 +480,50 @@ func TestDecimal_Sql(t *testing.T) {
 		assert.EqualValues(t, "Passed value 1.23 should be a string", err.Error())
 	})
 }
+
+func TestDecimal_Max(t *testing.T) {
+	t.Run("a > b", func(t *testing.T) {
+		a := NewDecimal(2)
+		b := NewDecimal(1)
+
+		assert.Equal(t, a.Max(b), a)
+	})
+
+	t.Run("a = b", func(t *testing.T) {
+
+		a := NewDecimal(1)
+		b := NewDecimal(1)
+
+		assert.Equal(t, a.Max(b), a)
+	})
+
+	t.Run("a < b", func(t *testing.T) {
+		a := NewDecimal(1)
+		b := NewDecimal(2)
+
+		assert.Equal(t, a.Max(b), b)
+	})
+}
+
+func TestDecimal_Min(t *testing.T) {
+	t.Run("a > b", func(t *testing.T) {
+		a := NewDecimal(2)
+		b := NewDecimal(1)
+
+		assert.Equal(t, a.Min(b), b)
+	})
+
+	t.Run("a = b", func(t *testing.T) {
+		a := NewDecimal(1)
+		b := NewDecimal(1)
+
+		assert.Equal(t, a.Min(b), a)
+	})
+
+	t.Run("a < b", func(t *testing.T) {
+		a := NewDecimal(1)
+		b := NewDecimal(2)
+
+		assert.Equal(t, a.Min(b), a)
+	})
+}
