@@ -1,8 +1,8 @@
 package big
 
 import (
+	"bytes"
 	"database/sql/driver"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -17,7 +17,7 @@ var (
 	flZero = *big.NewFloat(0)
 
 	// NaN == Not a Number
-	NaN = NewDecimal(math.NaN())
+	NaN = Decimal{nan: true}
 
 	// ZERO == 0
 	ZERO = NewFromString("0")
@@ -34,7 +34,8 @@ var (
 
 // Decimal is the main exported type. It is a simple, immutable wrapper around a *big.Float
 type Decimal struct {
-	fl *big.Float
+	fl  *big.Float
+	nan bool
 }
 
 // NewDecimal creates a new Decimal type from a float value.
@@ -59,7 +60,7 @@ func NewFromString(str string) Decimal {
 		return NaN
 	}
 
-	return Decimal{bfl}
+	return Decimal{fl: bfl}
 }
 
 // NewFromInt creates a new Decimal type from an int value
@@ -144,28 +145,28 @@ func MinSlice(decimals ...Decimal) Decimal {
 // Add adds a decimal instance to another Decimal instance.
 func (d Decimal) Add(addend Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{d.cpy().Add(d.fl, addend.fl)}
+		return Decimal{fl: d.cpy().Add(d.value(), addend.value())}
 	}, d, addend)
 }
 
 // Sub subtracts another decimal instance from this Decimal instance.
 func (d Decimal) Sub(subtrahend Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{d.cpy().Sub(d.fl, subtrahend.fl)}
+		return Decimal{fl: d.cpy().Sub(d.value(), subtrahend.value())}
 	}, d, subtrahend)
 }
 
 // Mul multiplies another decimal instance with this Decimal instance.
 func (d Decimal) Mul(factor Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{d.cpy().Mul(d.fl, factor.fl)}
+		return Decimal{fl: d.cpy().Mul(d.value(), factor.value())}
 	}, d, factor)
 }
 
 // Div divides this Decimal by the denominator passed.
 func (d Decimal) Div(denominator Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{d.cpy().Quo(d.fl, denominator.fl)}
+		return Decimal{fl: d.cpy().Quo(d.value(), denominator.value())}
 	}, d, denominator)
 }
 
@@ -211,7 +212,7 @@ func (d Decimal) Pow(exp int) Decimal {
 		}
 
 		x := ONE
-		base := Decimal{d.cpy()}
+		base := Decimal{fl: d.cpy()}
 
 		for exp > 0 {
 			if exp%2 == 1 {
@@ -235,7 +236,7 @@ func (d Decimal) Sqrt() Decimal {
 			return NaN
 		}
 
-		return Decimal{d.cpy().Sqrt(d.cpy())}
+		return Decimal{fl: d.cpy().Sqrt(d.cpy())}
 	}, d)
 }
 
@@ -290,7 +291,7 @@ func (d Decimal) Cmp(other Decimal) int {
 		return 0
 	}
 
-	return d.fl.Cmp(other.fl)
+	return d.value().Cmp(other.value())
 }
 
 // Float will return this Decimal as a float value.
@@ -300,7 +301,7 @@ func (d Decimal) Float() float64 {
 		return math.NaN()
 	}
 
-	f, _ := d.fl.Float64()
+	f, _ := d.value().Float64()
 	return f
 }
 
@@ -312,7 +313,7 @@ func (d Decimal) Zero() bool {
 
 // NaN returns true if the underlying is not a valid number
 func (d Decimal) NaN() bool {
-	return d.fl == nil
+	return d.nan
 }
 
 // IsZero will return true if this Decimal is equal to 0.
@@ -321,7 +322,7 @@ func (d Decimal) IsZero() bool {
 		return false
 	}
 
-	return d.fl == nil || d.fl.Cmp(&flZero) == 0
+	return d.value().Cmp(&flZero) == 0
 }
 
 func (d Decimal) String() string {
@@ -329,11 +330,7 @@ func (d Decimal) String() string {
 		return "NaN"
 	}
 
-	if d.fl == nil {
-		d.fl = new(big.Float)
-	}
-
-	return d.fl.String()
+	return d.value().String()
 }
 
 // FormattedString returns the string value of the number to the requested precision
@@ -353,20 +350,33 @@ func (d Decimal) MarshalJSON() ([]byte, error) {
 		return []byte("\"" + d.String() + "\""), nil
 	}
 
-	return d.fl.MarshalText()
+	if d.NaN() {
+		return []byte("null"), nil
+	}
+
+	return d.value().MarshalText()
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface
 func (d *Decimal) UnmarshalJSON(b []byte) error {
-	if d.fl == nil {
-		d.fl = big.NewFloat(0)
-	}
+	b = bytes.TrimSpace(b)
 
 	if isQuoted(b) {
 		b = b[1 : len(b)-1]
 	}
 
-	return d.fl.UnmarshalText(b)
+	if bytes.Equal(b, []byte("null")) || bytes.Equal(b, []byte("NaN")) {
+		*d = NaN
+		return nil
+	}
+
+	fl := newFloat(decimalPrecision(string(b)))
+	if _, _, err := fl.Parse(string(b), 10); err != nil {
+		return err
+	}
+
+	*d = Decimal{fl: fl}
+	return nil
 }
 
 func isQuoted(b []byte) bool {
@@ -383,17 +393,29 @@ func (d Decimal) Value() (driver.Value, error) {
 func (d *Decimal) Scan(src interface{}) error {
 	switch src := src.(type) {
 	case string:
-		return json.Unmarshal([]byte(src), d)
+		return d.UnmarshalJSON([]byte(src))
 	case []byte:
-		return json.Unmarshal(src, d)
+		return d.UnmarshalJSON(src)
+	case nil:
+		*d = NaN
+		return nil
 	default:
 		return errors.New(fmt.Sprint("Passed value ", src, " should be a string"))
 	}
 }
 
 func (d Decimal) cpy() *big.Float {
-	cpy := new(big.Float)
-	return cpy.Copy(d.fl)
+	val := d.value()
+	cpy := newFloat(val.Prec())
+	return cpy.Copy(val)
+}
+
+func (d Decimal) value() *big.Float {
+	if d.fl != nil {
+		return d.fl
+	}
+
+	return newFloat(minPrecision)
 }
 
 func anyNan(decimals ...Decimal) bool {

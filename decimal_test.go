@@ -46,7 +46,7 @@ func TestNewDecimal(t *testing.T) {
 	t.Run("NaN", func(t *testing.T) {
 		d := NewDecimal(math.NaN())
 
-		assert.Nil(t, d.fl)
+		assert.True(t, d.NaN())
 	})
 }
 
@@ -399,6 +399,10 @@ func TestDecimal_String(t *testing.T) {
 			value:    NaN,
 			expected: "NaN",
 		},
+		equalExample{
+			value:    Decimal{},
+			expected: "0",
+		},
 	)
 }
 
@@ -420,6 +424,10 @@ func TestDecimal_IsZero(t *testing.T) {
 		booleanExample{
 			value:    NaN.IsZero(),
 			expected: false,
+		},
+		booleanExample{
+			value:    Decimal{}.IsZero(),
+			expected: true,
 		},
 	)
 }
@@ -450,6 +458,24 @@ func TestDecimal_Json(t *testing.T) {
 		assert.Equal(t, `{"decimal":3.1419}`, string(marshaled))
 	})
 
+	t.Run("MarshalJSON - zero value", func(t *testing.T) {
+		tmpStruct := jsonType{}
+		marshaled, err := json.Marshal(tmpStruct)
+
+		assert.NoError(t, err)
+		assert.Equal(t, `{"decimal":0}`, string(marshaled))
+	})
+
+	t.Run("MarshalJSON - NaN", func(t *testing.T) {
+		tmpStruct := jsonType{
+			Decimal: NaN,
+		}
+		marshaled, err := json.Marshal(tmpStruct)
+
+		assert.NoError(t, err)
+		assert.Equal(t, `{"decimal":null}`, string(marshaled))
+	})
+
 	t.Run("UnmarshalJSON - unquoted", func(t *testing.T) {
 		var ts jsonType
 
@@ -468,6 +494,16 @@ func TestDecimal_Json(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, "3.1419", ts.Decimal.String())
+	})
+
+	t.Run("UnmarshalJSON - null", func(t *testing.T) {
+		var ts jsonType
+
+		d := `{"decimal":null}`
+		err := json.Unmarshal([]byte(d), &ts)
+
+		assert.NoError(t, err)
+		assert.True(t, ts.Decimal.NaN())
 	})
 }
 
@@ -498,6 +534,24 @@ func TestDecimal_Sql(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, "1.23", d.String())
+	})
+
+	t.Run("Scan NaN", func(t *testing.T) {
+		var d Decimal
+
+		err := d.Scan("NaN")
+
+		assert.NoError(t, err)
+		assert.True(t, d.NaN())
+	})
+
+	t.Run("Scan nil", func(t *testing.T) {
+		var d Decimal
+
+		err := d.Scan(nil)
+
+		assert.NoError(t, err)
+		assert.True(t, d.NaN())
 	})
 
 	t.Run("Scan returns error when src is not string", func(t *testing.T) {
