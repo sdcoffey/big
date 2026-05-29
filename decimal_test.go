@@ -375,6 +375,8 @@ func TestDecimal_Cmp(t *testing.T) {
 	assert.EqualValues(t, 1, TEN.Cmp(ONE))
 	assert.EqualValues(t, -1, ONE.Cmp(TEN))
 	assert.EqualValues(t, 0, NaN.Cmp(NaN))
+	assert.EqualValues(t, -1, NaN.Cmp(ONE))
+	assert.EqualValues(t, 1, ONE.Cmp(NaN))
 }
 
 func TestDecimal_Float(t *testing.T) {

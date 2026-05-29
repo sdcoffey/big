@@ -295,8 +295,16 @@ func (d Decimal) GTE(other Decimal) bool {
 
 // Cmp will return 1 if this decimal is greater than the provided, 0 if they are the same, and -1 if it is less.
 func (d Decimal) Cmp(other Decimal) int {
-	if anyNan(d, other) {
+	if d.NaN() && other.NaN() {
 		return 0
+	}
+
+	if d.NaN() {
+		return -1
+	}
+
+	if other.NaN() {
+		return 1
 	}
 
 	return d.value().Cmp(other.value())
