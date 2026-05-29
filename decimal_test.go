@@ -207,6 +207,14 @@ func TestDecimal_Mul(t *testing.T) {
 			expected: "NaN",
 		},
 	)
+
+	t.Run("preserves operand precision", func(t *testing.T) {
+		long := NewFromString("9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999")
+		result := ONE.Mul(long)
+
+		assert.Equal(t, 0, result.Cmp(long))
+		assert.GreaterOrEqual(t, result.fl.Prec(), long.fl.Prec())
+	})
 }
 
 func TestDecimal_Div(t *testing.T) {
@@ -445,6 +453,7 @@ func TestDecimal_String(t *testing.T) {
 
 func TestDecimal_FormattedString(t *testing.T) {
 	assert.EqualValues(t, "3.1416", NewDecimal(math.Pi).FormattedString(4))
+	assert.EqualValues(t, "9007199254740993", NewFromString("9007199254740993").FormattedString(0))
 	assert.EqualValues(t, "NaN", NaN.FormattedString(4))
 }
 

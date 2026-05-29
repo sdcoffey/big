@@ -153,28 +153,28 @@ func MinSlice(decimals ...Decimal) Decimal {
 // Add adds a decimal instance to another Decimal instance.
 func (d Decimal) Add(addend Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{fl: d.cpy().Add(d.value(), addend.value())}
+		return Decimal{fl: resultFloat(1, d, addend).Add(d.value(), addend.value())}
 	}, d, addend)
 }
 
 // Sub subtracts another decimal instance from this Decimal instance.
 func (d Decimal) Sub(subtrahend Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{fl: d.cpy().Sub(d.value(), subtrahend.value())}
+		return Decimal{fl: resultFloat(1, d, subtrahend).Sub(d.value(), subtrahend.value())}
 	}, d, subtrahend)
 }
 
 // Mul multiplies another decimal instance with this Decimal instance.
 func (d Decimal) Mul(factor Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{fl: d.cpy().Mul(d.value(), factor.value())}
+		return Decimal{fl: newFloat(sumPrecision(d, factor)).Mul(d.value(), factor.value())}
 	}, d, factor)
 }
 
 // Div divides this Decimal by the denominator passed.
 func (d Decimal) Div(denominator Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{fl: d.cpy().Quo(d.value(), denominator.value())}
+		return Decimal{fl: resultFloat(0, d, denominator).Quo(d.value(), denominator.value())}
 	}, d, denominator)
 }
 
@@ -355,9 +355,7 @@ func (d Decimal) FormattedString(places int) string {
 		return d.String()
 	}
 
-	format := "%." + fmt.Sprint(places) + "f"
-	fl := d.Float()
-	return fmt.Sprintf(format, fl)
+	return d.value().Text('f', places)
 }
 
 // MarshalJSON implements the json.Marshaler interface
@@ -424,6 +422,38 @@ func (d Decimal) cpy() *big.Float {
 	val := d.value()
 	cpy := newFloat(val.Prec())
 	return cpy.Copy(val)
+}
+
+func resultFloat(extra uint, decimals ...Decimal) *big.Float {
+	return newFloat(maxPrecision(decimals...) + extra)
+}
+
+func maxPrecision(decimals ...Decimal) uint {
+	precision := minPrecision
+	for _, decimal := range decimals {
+		if decimal.NaN() {
+			continue
+		}
+
+		if valuePrecision := decimal.value().Prec(); valuePrecision > precision {
+			precision = valuePrecision
+		}
+	}
+
+	return precision
+}
+
+func sumPrecision(decimals ...Decimal) uint {
+	precision := uint(0)
+	for _, decimal := range decimals {
+		if decimal.NaN() {
+			continue
+		}
+
+		precision += decimal.value().Prec()
+	}
+
+	return precision
 }
 
 func (d Decimal) value() *big.Float {
