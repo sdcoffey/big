@@ -107,7 +107,8 @@ func intPrecision(dec int) uint {
 	}
 
 	if dec < 0 {
-		return uint(bits.Len64(uint64(-(dec + 1))+1)) + 1
+		magnitude := uint64(-(dec + 1)) + 1
+		return uint(bits.Len64(magnitude)) + 1
 	}
 
 	return uint(bits.Len64(uint64(dec))) + 1

@@ -82,6 +82,11 @@ func TestNewFromInt(t *testing.T) {
 		expected.SetInt64(int64(large))
 
 		assert.Equal(t, 0, NewFromInt(large).fl.Cmp(expected))
+
+		min := -int(^uint(0)>>1) - 1
+		expected.SetInt64(int64(min))
+
+		assert.Equal(t, 0, NewFromInt(min).fl.Cmp(expected))
 	}
 }
 
