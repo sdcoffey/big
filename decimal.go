@@ -202,10 +202,26 @@ func (d Decimal) Pow(exp int) Decimal {
 			return ONE
 		}
 
-		x := Decimal{d.cpy()}
+		if exp < 0 {
+			if d.IsZero() {
+				return NaN
+			}
 
-		for i := 1; i < exp; i++ {
-			x = x.Mul(d)
+			return ONE.Div(d.Pow(-exp))
+		}
+
+		x := ONE
+		base := Decimal{d.cpy()}
+
+		for exp > 0 {
+			if exp%2 == 1 {
+				x = x.Mul(base)
+			}
+
+			exp /= 2
+			if exp > 0 {
+				base = base.Mul(base)
+			}
 		}
 
 		return x
@@ -215,6 +231,10 @@ func (d Decimal) Pow(exp int) Decimal {
 // Sqrt returns the decimal's square root
 func (d Decimal) Sqrt() Decimal {
 	return nanGuard(func() Decimal {
+		if d.LT(ZERO) {
+			return NaN
+		}
+
 		return Decimal{d.cpy().Sqrt(d.cpy())}
 	}, d)
 }

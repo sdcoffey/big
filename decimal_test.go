@@ -358,6 +358,14 @@ func TestDecimal_Pow(t *testing.T) {
 			expected: "1",
 		},
 		equalExample{
+			value:    TEN.Pow(-2),
+			expected: "0.01",
+		},
+		equalExample{
+			value:    ZERO.Pow(-1),
+			expected: "NaN",
+		},
+		equalExample{
 			value:    NaN.Pow(2),
 			expected: "NaN",
 		},
@@ -369,6 +377,10 @@ func TestDecimal_Sqrt(t *testing.T) {
 		equalExample{
 			value:    NewDecimal(64).Sqrt(),
 			expected: "8",
+		},
+		equalExample{
+			value:    NewDecimal(-1).Sqrt(),
+			expected: "NaN",
 		},
 		equalExample{
 			value:    NaN.Sqrt(),
