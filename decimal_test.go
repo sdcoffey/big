@@ -3,6 +3,8 @@ package big
 import (
 	"encoding/json"
 	"math"
+	mathbig "math/big"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,12 +61,28 @@ func TestNewFromString(t *testing.T) {
 			expected: "NaN",
 		},
 	)
+
+	t.Run("preserves large integer precision", func(t *testing.T) {
+		d := NewFromString("9007199254740993")
+		expected := new(mathbig.Float).SetPrec(minPrecision)
+		expected.SetInt64(9007199254740993)
+
+		assert.Equal(t, 0, d.fl.Cmp(expected))
+	})
 }
 
 func TestNewFromInt(t *testing.T) {
 	d := NewFromInt(1)
 
 	assert.EqualValues(t, "1", d.String())
+
+	if strconv.IntSize == 64 {
+		large := int(9007199254740993)
+		expected := new(mathbig.Float).SetPrec(minPrecision)
+		expected.SetInt64(int64(large))
+
+		assert.Equal(t, 0, NewFromInt(large).fl.Cmp(expected))
+	}
 }
 
 func TestMaxSlice(t *testing.T) {

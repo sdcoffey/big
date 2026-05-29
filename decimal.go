@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"math/bits"
+	"unicode"
 )
+
+const minPrecision uint = 256
 
 var (
 	flZero = *big.NewFloat(0)
@@ -35,18 +39,12 @@ type Decimal struct {
 
 // NewDecimal creates a new Decimal type from a float value.
 func NewDecimal(val float64) Decimal {
-	var fl *big.Float
+	if math.IsNaN(val) {
+		return NaN
+	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			switch r.(type) {
-			case big.ErrNaN:
-				fl = nil
-			}
-		}
-	}()
-
-	fl = big.NewFloat(val)
+	fl := newFloat(53)
+	fl.SetFloat64(val)
 
 	return Decimal{
 		fl: fl,
@@ -55,7 +53,7 @@ func NewDecimal(val float64) Decimal {
 
 // NewFromString creates a new Decimal type from a string value.
 func NewFromString(str string) Decimal {
-	bfl := big.NewFloat(0)
+	bfl := newFloat(decimalPrecision(str))
 
 	if _, _, err := bfl.Parse(str, 10); err != nil {
 		return NaN
@@ -66,7 +64,44 @@ func NewFromString(str string) Decimal {
 
 // NewFromInt creates a new Decimal type from an int value
 func NewFromInt(dec int) Decimal {
-	return Decimal{big.NewFloat(float64(dec))}
+	fl := newFloat(intPrecision(dec))
+	fl.SetInt64(int64(dec))
+	return Decimal{fl: fl}
+}
+
+func newFloat(precision uint) *big.Float {
+	if precision < minPrecision {
+		precision = minPrecision
+	}
+
+	return new(big.Float).SetPrec(precision).SetMode(big.ToNearestEven)
+}
+
+func decimalPrecision(str string) uint {
+	digits := 0
+	for _, char := range str {
+		if unicode.IsDigit(char) {
+			digits++
+		}
+	}
+
+	if digits == 0 {
+		return minPrecision
+	}
+
+	return uint(digits)*4 + 16
+}
+
+func intPrecision(dec int) uint {
+	if dec == 0 {
+		return minPrecision
+	}
+
+	if dec < 0 {
+		return uint(bits.Len64(uint64(-(dec + 1))+1)) + 1
+	}
+
+	return uint(bits.Len64(uint64(dec))) + 1
 }
 
 // MaxSlice returns the max of a slice of decimals
