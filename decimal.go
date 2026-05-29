@@ -1,19 +1,23 @@
 package big
 
 import (
+	"bytes"
 	"database/sql/driver"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"math/big"
+	"math/bits"
+	"unicode"
 )
+
+const minPrecision uint = 256
 
 var (
 	flZero = *big.NewFloat(0)
 
 	// NaN == Not a Number
-	NaN = NewDecimal(math.NaN())
+	NaN = Decimal{nan: true}
 
 	// ZERO == 0
 	ZERO = NewFromString("0")
@@ -30,23 +34,18 @@ var (
 
 // Decimal is the main exported type. It is a simple, immutable wrapper around a *big.Float
 type Decimal struct {
-	fl *big.Float
+	fl  *big.Float
+	nan bool
 }
 
 // NewDecimal creates a new Decimal type from a float value.
 func NewDecimal(val float64) Decimal {
-	var fl *big.Float
+	if math.IsNaN(val) {
+		return Decimal{nan: true}
+	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			switch r.(type) {
-			case big.ErrNaN:
-				fl = nil
-			}
-		}
-	}()
-
-	fl = big.NewFloat(val)
+	fl := newFloat(53)
+	fl.SetFloat64(val)
 
 	return Decimal{
 		fl: fl,
@@ -55,18 +54,64 @@ func NewDecimal(val float64) Decimal {
 
 // NewFromString creates a new Decimal type from a string value.
 func NewFromString(str string) Decimal {
-	bfl := big.NewFloat(0)
+	bfl := newFloat(decimalPrecision(str))
 
 	if _, _, err := bfl.Parse(str, 10); err != nil {
 		return NaN
 	}
 
-	return Decimal{bfl}
+	return Decimal{fl: bfl}
 }
 
 // NewFromInt creates a new Decimal type from an int value
 func NewFromInt(dec int) Decimal {
-	return Decimal{big.NewFloat(float64(dec))}
+	fl := newFloat(intPrecision(dec))
+	fl.SetInt64(int64(dec))
+	return Decimal{fl: fl}
+}
+
+func newFloat(precision uint) *big.Float {
+	if precision < minPrecision {
+		precision = minPrecision
+	}
+
+	return new(big.Float).SetPrec(precision).SetMode(big.ToNearestEven)
+}
+
+func zeroDecimal() Decimal {
+	return NewFromInt(0)
+}
+
+func oneDecimal() Decimal {
+	return NewFromInt(1)
+}
+
+func decimalPrecision(str string) uint {
+	digits := 0
+	for _, char := range str {
+		if unicode.IsDigit(char) {
+			digits++
+		}
+	}
+
+	if digits == 0 {
+		return minPrecision
+	}
+
+	return uint(digits)*4 + 16
+}
+
+func intPrecision(dec int) uint {
+	if dec == 0 {
+		return minPrecision
+	}
+
+	if dec < 0 {
+		magnitude := uint64(-(dec + 1)) + 1
+		return uint(bits.Len64(magnitude)) + 1
+	}
+
+	return uint(bits.Len64(uint64(dec))) + 1
 }
 
 // MaxSlice returns the max of a slice of decimals
@@ -74,7 +119,7 @@ func MaxSlice(decimals ...Decimal) Decimal {
 	if anyNan(decimals...) {
 		return NaN
 	} else if len(decimals) == 0 {
-		return ZERO
+		return zeroDecimal()
 	}
 
 	initial := NewFromString("-Inf")
@@ -93,7 +138,7 @@ func MinSlice(decimals ...Decimal) Decimal {
 	if anyNan(decimals...) {
 		return NaN
 	} else if len(decimals) == 0 {
-		return ZERO
+		return zeroDecimal()
 	}
 
 	initial := NewFromString("Inf")
@@ -109,28 +154,28 @@ func MinSlice(decimals ...Decimal) Decimal {
 // Add adds a decimal instance to another Decimal instance.
 func (d Decimal) Add(addend Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{d.cpy().Add(d.fl, addend.fl)}
+		return Decimal{fl: resultFloat(1, d, addend).Add(d.value(), addend.value())}
 	}, d, addend)
 }
 
 // Sub subtracts another decimal instance from this Decimal instance.
 func (d Decimal) Sub(subtrahend Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{d.cpy().Sub(d.fl, subtrahend.fl)}
+		return Decimal{fl: resultFloat(1, d, subtrahend).Sub(d.value(), subtrahend.value())}
 	}, d, subtrahend)
 }
 
 // Mul multiplies another decimal instance with this Decimal instance.
 func (d Decimal) Mul(factor Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{d.cpy().Mul(d.fl, factor.fl)}
+		return Decimal{fl: newFloat(sumPrecision(d, factor)).Mul(d.value(), factor.value())}
 	}, d, factor)
 }
 
 // Div divides this Decimal by the denominator passed.
 func (d Decimal) Div(denominator Decimal) Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{d.cpy().Quo(d.fl, denominator.fl)}
+		return Decimal{fl: resultFloat(0, d, denominator).Quo(d.value(), denominator.value())}
 	}, d, denominator)
 }
 
@@ -153,8 +198,8 @@ func (d Decimal) Neg() Decimal {
 
 // Abs returns the absolute value of this Decimal
 func (d Decimal) Abs() Decimal {
-	if d.LT(ZERO) {
-		return d.Mul(ONE.Neg())
+	if d.LT(zeroDecimal()) {
+		return d.Neg()
 	}
 
 	return d
@@ -164,23 +209,57 @@ func (d Decimal) Abs() Decimal {
 func (d Decimal) Pow(exp int) Decimal {
 	return nanGuard(func() Decimal {
 		if exp == 0 {
-			return ONE
+			return oneDecimal()
 		}
 
-		x := Decimal{d.cpy()}
+		if d.EQ(oneDecimal()) {
+			return oneDecimal()
+		}
 
-		for i := 1; i < exp; i++ {
-			x = x.Mul(d)
+		if exp < 0 {
+			if d.IsZero() {
+				return NaN
+			}
+
+			return oneDecimal().Div(d.pow(negativeExponentMagnitude(exp)))
+		}
+
+		return d.pow(uint(exp))
+	}, d)
+}
+
+func (d Decimal) pow(exp uint) Decimal {
+	return nanGuard(func() Decimal {
+		x := oneDecimal()
+		base := Decimal{fl: d.cpy()}
+
+		for exp > 0 {
+			if exp%2 == 1 {
+				x = x.Mul(base)
+			}
+
+			exp /= 2
+			if exp > 0 {
+				base = base.Mul(base)
+			}
 		}
 
 		return x
 	}, d)
 }
 
+func negativeExponentMagnitude(exp int) uint {
+	return uint(-(exp + 1)) + 1
+}
+
 // Sqrt returns the decimal's square root
 func (d Decimal) Sqrt() Decimal {
 	return nanGuard(func() Decimal {
-		return Decimal{d.cpy().Sqrt(d.cpy())}
+		if d.LT(zeroDecimal()) {
+			return NaN
+		}
+
+		return Decimal{fl: d.cpy().Sqrt(d.cpy())}
 	}, d)
 }
 
@@ -231,11 +310,19 @@ func (d Decimal) GTE(other Decimal) bool {
 
 // Cmp will return 1 if this decimal is greater than the provided, 0 if they are the same, and -1 if it is less.
 func (d Decimal) Cmp(other Decimal) int {
-	if anyNan(d, other) {
+	if d.NaN() && other.NaN() {
 		return 0
 	}
 
-	return d.fl.Cmp(other.fl)
+	if d.NaN() {
+		return -1
+	}
+
+	if other.NaN() {
+		return 1
+	}
+
+	return d.value().Cmp(other.value())
 }
 
 // Float will return this Decimal as a float value.
@@ -245,7 +332,7 @@ func (d Decimal) Float() float64 {
 		return math.NaN()
 	}
 
-	f, _ := d.fl.Float64()
+	f, _ := d.value().Float64()
 	return f
 }
 
@@ -257,7 +344,7 @@ func (d Decimal) Zero() bool {
 
 // NaN returns true if the underlying is not a valid number
 func (d Decimal) NaN() bool {
-	return d.fl == nil
+	return d.nan
 }
 
 // IsZero will return true if this Decimal is equal to 0.
@@ -266,7 +353,7 @@ func (d Decimal) IsZero() bool {
 		return false
 	}
 
-	return d.fl == nil || d.fl.Cmp(&flZero) == 0
+	return d.value().Cmp(&flZero) == 0
 }
 
 func (d Decimal) String() string {
@@ -274,11 +361,7 @@ func (d Decimal) String() string {
 		return "NaN"
 	}
 
-	if d.fl == nil {
-		d.fl = new(big.Float)
-	}
-
-	return d.fl.String()
+	return d.value().String()
 }
 
 // FormattedString returns the string value of the number to the requested precision
@@ -287,9 +370,7 @@ func (d Decimal) FormattedString(places int) string {
 		return d.String()
 	}
 
-	format := "%." + fmt.Sprint(places) + "f"
-	fl := d.Float()
-	return fmt.Sprintf(format, fl)
+	return d.value().Text('f', places)
 }
 
 // MarshalJSON implements the json.Marshaler interface
@@ -298,20 +379,33 @@ func (d Decimal) MarshalJSON() ([]byte, error) {
 		return []byte("\"" + d.String() + "\""), nil
 	}
 
-	return d.fl.MarshalText()
+	if d.NaN() {
+		return []byte("null"), nil
+	}
+
+	return d.value().MarshalText()
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface
 func (d *Decimal) UnmarshalJSON(b []byte) error {
-	if d.fl == nil {
-		d.fl = big.NewFloat(0)
-	}
+	b = bytes.TrimSpace(b)
 
 	if isQuoted(b) {
 		b = b[1 : len(b)-1]
 	}
 
-	return d.fl.UnmarshalText(b)
+	if bytes.Equal(b, []byte("null")) || bytes.Equal(b, []byte("NaN")) {
+		*d = NaN
+		return nil
+	}
+
+	fl := newFloat(decimalPrecision(string(b)))
+	if _, _, err := fl.Parse(string(b), 10); err != nil {
+		return err
+	}
+
+	*d = Decimal{fl: fl}
+	return nil
 }
 
 func isQuoted(b []byte) bool {
@@ -328,17 +422,61 @@ func (d Decimal) Value() (driver.Value, error) {
 func (d *Decimal) Scan(src interface{}) error {
 	switch src := src.(type) {
 	case string:
-		return json.Unmarshal([]byte(src), d)
+		return d.UnmarshalJSON([]byte(src))
 	case []byte:
-		return json.Unmarshal(src, d)
+		return d.UnmarshalJSON(src)
+	case nil:
+		*d = NaN
+		return nil
 	default:
 		return errors.New(fmt.Sprint("Passed value ", src, " should be a string"))
 	}
 }
 
 func (d Decimal) cpy() *big.Float {
-	cpy := new(big.Float)
-	return cpy.Copy(d.fl)
+	val := d.value()
+	cpy := newFloat(val.Prec())
+	return cpy.Copy(val)
+}
+
+func resultFloat(extra uint, decimals ...Decimal) *big.Float {
+	return newFloat(maxPrecision(decimals...) + extra)
+}
+
+func maxPrecision(decimals ...Decimal) uint {
+	precision := minPrecision
+	for _, decimal := range decimals {
+		if decimal.NaN() {
+			continue
+		}
+
+		if valuePrecision := decimal.value().Prec(); valuePrecision > precision {
+			precision = valuePrecision
+		}
+	}
+
+	return precision
+}
+
+func sumPrecision(decimals ...Decimal) uint {
+	precision := uint(0)
+	for _, decimal := range decimals {
+		if decimal.NaN() {
+			continue
+		}
+
+		precision += decimal.value().Prec()
+	}
+
+	return precision
+}
+
+func (d Decimal) value() *big.Float {
+	if d.fl != nil {
+		return d.fl
+	}
+
+	return newFloat(minPrecision)
 }
 
 func anyNan(decimals ...Decimal) bool {

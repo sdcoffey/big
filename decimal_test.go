@@ -3,6 +3,8 @@ package big
 import (
 	"encoding/json"
 	"math"
+	mathbig "math/big"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,7 +46,18 @@ func TestNewDecimal(t *testing.T) {
 	t.Run("NaN", func(t *testing.T) {
 		d := NewDecimal(math.NaN())
 
-		assert.Nil(t, d.fl)
+		assert.True(t, d.NaN())
+	})
+
+	t.Run("NaN ignores exported sentinel mutation", func(t *testing.T) {
+		oldNaN := NaN
+		t.Cleanup(func() {
+			NaN = oldNaN
+		})
+
+		NaN = TEN
+
+		assert.True(t, NewDecimal(math.NaN()).NaN())
 	})
 }
 
@@ -59,12 +72,33 @@ func TestNewFromString(t *testing.T) {
 			expected: "NaN",
 		},
 	)
+
+	t.Run("preserves large integer precision", func(t *testing.T) {
+		d := NewFromString("9007199254740993")
+		expected := new(mathbig.Float).SetPrec(minPrecision)
+		expected.SetInt64(9007199254740993)
+
+		assert.Equal(t, 0, d.fl.Cmp(expected))
+	})
 }
 
 func TestNewFromInt(t *testing.T) {
 	d := NewFromInt(1)
 
 	assert.EqualValues(t, "1", d.String())
+
+	if strconv.IntSize == 64 {
+		large := int(9007199254740993)
+		expected := new(mathbig.Float).SetPrec(minPrecision)
+		expected.SetInt64(int64(large))
+
+		assert.Equal(t, 0, NewFromInt(large).fl.Cmp(expected))
+
+		min := -int(^uint(0)>>1) - 1
+		expected.SetInt64(int64(min))
+
+		assert.Equal(t, 0, NewFromInt(min).fl.Cmp(expected))
+	}
 }
 
 func TestMaxSlice(t *testing.T) {
@@ -101,6 +135,41 @@ func TestMinSlice(t *testing.T) {
 		equalExample{
 			value:    MinSlice(),
 			expected: "0",
+		},
+	)
+}
+
+func TestExportedSentinelsDoNotAffectInternalMath(t *testing.T) {
+	oldZero := ZERO
+	oldOne := ONE
+	t.Cleanup(func() {
+		ZERO = oldZero
+		ONE = oldOne
+	})
+
+	ZERO = TEN
+	ONE = TEN
+
+	validateEqExamples(t,
+		equalExample{
+			value:    MaxSlice(),
+			expected: "0",
+		},
+		equalExample{
+			value:    MinSlice(),
+			expected: "0",
+		},
+		equalExample{
+			value:    NewFromString("-10").Abs(),
+			expected: "10",
+		},
+		equalExample{
+			value:    TEN.Pow(0),
+			expected: "1",
+		},
+		equalExample{
+			value:    NewFromString("-1").Sqrt(),
+			expected: "NaN",
 		},
 	)
 }
@@ -154,6 +223,14 @@ func TestDecimal_Mul(t *testing.T) {
 			expected: "NaN",
 		},
 	)
+
+	t.Run("preserves operand precision", func(t *testing.T) {
+		long := NewFromString("9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999")
+		result := ONE.Mul(long)
+
+		assert.Equal(t, 0, result.Cmp(long))
+		assert.GreaterOrEqual(t, result.fl.Prec(), long.fl.Prec())
+	})
 }
 
 func TestDecimal_Div(t *testing.T) {
@@ -322,6 +399,8 @@ func TestDecimal_Cmp(t *testing.T) {
 	assert.EqualValues(t, 1, TEN.Cmp(ONE))
 	assert.EqualValues(t, -1, ONE.Cmp(TEN))
 	assert.EqualValues(t, 0, NaN.Cmp(NaN))
+	assert.EqualValues(t, -1, NaN.Cmp(ONE))
+	assert.EqualValues(t, 1, ONE.Cmp(NaN))
 }
 
 func TestDecimal_Float(t *testing.T) {
@@ -340,6 +419,18 @@ func TestDecimal_Pow(t *testing.T) {
 			expected: "1",
 		},
 		equalExample{
+			value:    TEN.Pow(-2),
+			expected: "0.01",
+		},
+		equalExample{
+			value:    ZERO.Pow(-1),
+			expected: "NaN",
+		},
+		equalExample{
+			value:    ONE.Pow(-int(^uint(0)>>1) - 1),
+			expected: "1",
+		},
+		equalExample{
 			value:    NaN.Pow(2),
 			expected: "NaN",
 		},
@@ -351,6 +442,10 @@ func TestDecimal_Sqrt(t *testing.T) {
 		equalExample{
 			value:    NewDecimal(64).Sqrt(),
 			expected: "8",
+		},
+		equalExample{
+			value:    NewDecimal(-1).Sqrt(),
+			expected: "NaN",
 		},
 		equalExample{
 			value:    NaN.Sqrt(),
@@ -369,11 +464,16 @@ func TestDecimal_String(t *testing.T) {
 			value:    NaN,
 			expected: "NaN",
 		},
+		equalExample{
+			value:    Decimal{},
+			expected: "0",
+		},
 	)
 }
 
 func TestDecimal_FormattedString(t *testing.T) {
 	assert.EqualValues(t, "3.1416", NewDecimal(math.Pi).FormattedString(4))
+	assert.EqualValues(t, "9007199254740993", NewFromString("9007199254740993").FormattedString(0))
 	assert.EqualValues(t, "NaN", NaN.FormattedString(4))
 }
 
@@ -391,6 +491,10 @@ func TestDecimal_IsZero(t *testing.T) {
 			value:    NaN.IsZero(),
 			expected: false,
 		},
+		booleanExample{
+			value:    Decimal{}.IsZero(),
+			expected: true,
+		},
 	)
 }
 func TestDecimal_Json(t *testing.T) {
@@ -399,6 +503,11 @@ func TestDecimal_Json(t *testing.T) {
 	}
 
 	t.Run("MarshalJSON - quoted", func(t *testing.T) {
+		oldMarshalQuoted := MarshalQuoted
+		t.Cleanup(func() {
+			MarshalQuoted = oldMarshalQuoted
+		})
+
 		MarshalQuoted = true
 		tmpStruct := jsonType{
 			Decimal: NewFromString("3.1419"),
@@ -407,7 +516,6 @@ func TestDecimal_Json(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, `{"decimal":"3.1419"}`, string(marshaled))
-		MarshalQuoted = false
 	})
 
 	t.Run("MarshalJSON - unquoted", func(t *testing.T) {
@@ -418,6 +526,24 @@ func TestDecimal_Json(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, `{"decimal":3.1419}`, string(marshaled))
+	})
+
+	t.Run("MarshalJSON - zero value", func(t *testing.T) {
+		tmpStruct := jsonType{}
+		marshaled, err := json.Marshal(tmpStruct)
+
+		assert.NoError(t, err)
+		assert.Equal(t, `{"decimal":0}`, string(marshaled))
+	})
+
+	t.Run("MarshalJSON - NaN", func(t *testing.T) {
+		tmpStruct := jsonType{
+			Decimal: NaN,
+		}
+		marshaled, err := json.Marshal(tmpStruct)
+
+		assert.NoError(t, err)
+		assert.Equal(t, `{"decimal":null}`, string(marshaled))
 	})
 
 	t.Run("UnmarshalJSON - unquoted", func(t *testing.T) {
@@ -438,6 +564,16 @@ func TestDecimal_Json(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, "3.1419", ts.Decimal.String())
+	})
+
+	t.Run("UnmarshalJSON - null", func(t *testing.T) {
+		var ts jsonType
+
+		d := `{"decimal":null}`
+		err := json.Unmarshal([]byte(d), &ts)
+
+		assert.NoError(t, err)
+		assert.True(t, ts.Decimal.NaN())
 	})
 }
 
@@ -468,6 +604,24 @@ func TestDecimal_Sql(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, "1.23", d.String())
+	})
+
+	t.Run("Scan NaN", func(t *testing.T) {
+		var d Decimal
+
+		err := d.Scan("NaN")
+
+		assert.NoError(t, err)
+		assert.True(t, d.NaN())
+	})
+
+	t.Run("Scan nil", func(t *testing.T) {
+		var d Decimal
+
+		err := d.Scan(nil)
+
+		assert.NoError(t, err)
+		assert.True(t, d.NaN())
 	})
 
 	t.Run("Scan returns error when src is not string", func(t *testing.T) {
