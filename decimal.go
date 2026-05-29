@@ -78,6 +78,14 @@ func newFloat(precision uint) *big.Float {
 	return new(big.Float).SetPrec(precision).SetMode(big.ToNearestEven)
 }
 
+func zeroDecimal() Decimal {
+	return NewFromInt(0)
+}
+
+func oneDecimal() Decimal {
+	return NewFromInt(1)
+}
+
 func decimalPrecision(str string) uint {
 	digits := 0
 	for _, char := range str {
@@ -110,7 +118,7 @@ func MaxSlice(decimals ...Decimal) Decimal {
 	if anyNan(decimals...) {
 		return NaN
 	} else if len(decimals) == 0 {
-		return ZERO
+		return zeroDecimal()
 	}
 
 	initial := NewFromString("-Inf")
@@ -129,7 +137,7 @@ func MinSlice(decimals ...Decimal) Decimal {
 	if anyNan(decimals...) {
 		return NaN
 	} else if len(decimals) == 0 {
-		return ZERO
+		return zeroDecimal()
 	}
 
 	initial := NewFromString("Inf")
@@ -189,8 +197,8 @@ func (d Decimal) Neg() Decimal {
 
 // Abs returns the absolute value of this Decimal
 func (d Decimal) Abs() Decimal {
-	if d.LT(ZERO) {
-		return d.Mul(ONE.Neg())
+	if d.LT(zeroDecimal()) {
+		return d.Neg()
 	}
 
 	return d
@@ -200,7 +208,7 @@ func (d Decimal) Abs() Decimal {
 func (d Decimal) Pow(exp int) Decimal {
 	return nanGuard(func() Decimal {
 		if exp == 0 {
-			return ONE
+			return oneDecimal()
 		}
 
 		if exp < 0 {
@@ -208,10 +216,10 @@ func (d Decimal) Pow(exp int) Decimal {
 				return NaN
 			}
 
-			return ONE.Div(d.Pow(-exp))
+			return oneDecimal().Div(d.Pow(-exp))
 		}
 
-		x := ONE
+		x := oneDecimal()
 		base := Decimal{fl: d.cpy()}
 
 		for exp > 0 {
@@ -232,7 +240,7 @@ func (d Decimal) Pow(exp int) Decimal {
 // Sqrt returns the decimal's square root
 func (d Decimal) Sqrt() Decimal {
 	return nanGuard(func() Decimal {
-		if d.LT(ZERO) {
+		if d.LT(zeroDecimal()) {
 			return NaN
 		}
 

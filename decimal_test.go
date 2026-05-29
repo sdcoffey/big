@@ -123,6 +123,41 @@ func TestMinSlice(t *testing.T) {
 	)
 }
 
+func TestExportedSentinelsDoNotAffectInternalMath(t *testing.T) {
+	oldZero := ZERO
+	oldOne := ONE
+	t.Cleanup(func() {
+		ZERO = oldZero
+		ONE = oldOne
+	})
+
+	ZERO = TEN
+	ONE = TEN
+
+	validateEqExamples(t,
+		equalExample{
+			value:    MaxSlice(),
+			expected: "0",
+		},
+		equalExample{
+			value:    MinSlice(),
+			expected: "0",
+		},
+		equalExample{
+			value:    NewFromString("-10").Abs(),
+			expected: "10",
+		},
+		equalExample{
+			value:    TEN.Pow(0),
+			expected: "1",
+		},
+		equalExample{
+			value:    NewFromString("-1").Sqrt(),
+			expected: "NaN",
+		},
+	)
+}
+
 func TestDecimal_Add(t *testing.T) {
 	validateEqExamples(t,
 		equalExample{
@@ -437,6 +472,11 @@ func TestDecimal_Json(t *testing.T) {
 	}
 
 	t.Run("MarshalJSON - quoted", func(t *testing.T) {
+		oldMarshalQuoted := MarshalQuoted
+		t.Cleanup(func() {
+			MarshalQuoted = oldMarshalQuoted
+		})
+
 		MarshalQuoted = true
 		tmpStruct := jsonType{
 			Decimal: NewFromString("3.1419"),
@@ -445,7 +485,6 @@ func TestDecimal_Json(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, `{"decimal":"3.1419"}`, string(marshaled))
-		MarshalQuoted = false
 	})
 
 	t.Run("MarshalJSON - unquoted", func(t *testing.T) {
