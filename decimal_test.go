@@ -48,6 +48,17 @@ func TestNewDecimal(t *testing.T) {
 
 		assert.True(t, d.NaN())
 	})
+
+	t.Run("NaN ignores exported sentinel mutation", func(t *testing.T) {
+		oldNaN := NaN
+		t.Cleanup(func() {
+			NaN = oldNaN
+		})
+
+		NaN = TEN
+
+		assert.True(t, NewDecimal(math.NaN()).NaN())
+	})
 }
 
 func TestNewFromString(t *testing.T) {
@@ -414,6 +425,10 @@ func TestDecimal_Pow(t *testing.T) {
 		equalExample{
 			value:    ZERO.Pow(-1),
 			expected: "NaN",
+		},
+		equalExample{
+			value:    ONE.Pow(-int(^uint(0)>>1) - 1),
+			expected: "1",
 		},
 		equalExample{
 			value:    NaN.Pow(2),

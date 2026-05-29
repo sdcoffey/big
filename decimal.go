@@ -41,7 +41,7 @@ type Decimal struct {
 // NewDecimal creates a new Decimal type from a float value.
 func NewDecimal(val float64) Decimal {
 	if math.IsNaN(val) {
-		return NaN
+		return Decimal{nan: true}
 	}
 
 	fl := newFloat(53)
@@ -212,14 +212,24 @@ func (d Decimal) Pow(exp int) Decimal {
 			return oneDecimal()
 		}
 
+		if d.EQ(oneDecimal()) {
+			return oneDecimal()
+		}
+
 		if exp < 0 {
 			if d.IsZero() {
 				return NaN
 			}
 
-			return oneDecimal().Div(d.Pow(-exp))
+			return oneDecimal().Div(d.pow(negativeExponentMagnitude(exp)))
 		}
 
+		return d.pow(uint(exp))
+	}, d)
+}
+
+func (d Decimal) pow(exp uint) Decimal {
+	return nanGuard(func() Decimal {
 		x := oneDecimal()
 		base := Decimal{fl: d.cpy()}
 
@@ -236,6 +246,10 @@ func (d Decimal) Pow(exp int) Decimal {
 
 		return x
 	}, d)
+}
+
+func negativeExponentMagnitude(exp int) uint {
+	return uint(-(exp + 1)) + 1
 }
 
 // Sqrt returns the decimal's square root
